@@ -1,0 +1,37 @@
+<?php
+/**
+ * Class AdapterTest
+ *
+ * @package Wp_Job_Manager_Loxo_Api
+ */
+
+
+namespace SeattleWebCo\WPJobManager\Recruiter\Loxo;
+
+
+class AdapterTest extends \WP_UnitTestCase {
+
+	public $provider;
+
+
+	public function setUp() {
+		$this->provider = $this->getMockBuilder( '\SeattleWebCo\WPJobManager\Recruiter\Loxo\LoxoProvider' )
+						 ->setConstructorArgs( array( array( 'test', 'test', admin_url( 'edit.php?post_type=job_listing&page=job-manager-settings' ) ) ) )
+						 ->getMock();
+	}
+
+
+	public function test_connected() {
+		$adapter = $this->getMockBuilder( '\SeattleWebCo\WPJobManager\Recruiter\Loxo\Loxo_Adapter' )
+						->setConstructorArgs( array( $this->provider ) )
+						->getMock();
+
+		$adapter->expects( $this->any() )
+				->method( 'connected' )
+				->will( $this->returnValue( true ) );
+
+		$client = new Client( $adapter );
+
+		$this->assertTrue( $client->connected() );
+	}
+}
