@@ -40,8 +40,10 @@ class LoxoAdapter implements Adapter {
                 }
             }
 
+            $category = apply_filters( 'wp_job_manager_loxo_category', $category, $job );
+
             $job_type = get_term_by( 'name', isset( $job->job_type ) && isset( $job->job_type->name ) ? $job->job_type->name : '', 'job_listing_type', ARRAY_A );
-            $job_type = apply_filters( 'wp_job_manager_loxo_loxo_job_type', $job_type, $job );
+            $job_type = apply_filters( 'wp_job_manager_loxo_job_type', $job_type, $job );
 
             $jobs[] = array(
                 'post_title' 		=> isset( $job->title ) ? $job->title : __( 'Untitled job', 'wp-job-manager-loxo' ),
@@ -49,8 +51,8 @@ class LoxoAdapter implements Adapter {
                 'post_status'		=> 'publish',
                 'post_type'			=> 'job_listing',
                 'tax_input'         => array(
-                    'job_listing_category' => ! empty( $category ) && ! is_wp_error( $category ) ? $category['term_id'] : null,
-                    'job_listing_type'     => ! empty( $job_type ) && ! is_wp_error( $job_type ) ? $job_type['term_id'] : null,
+                    'job_listing_category' => ! empty( $category ) && ! is_wp_error( $category ) ? array( $category['term_id'] ) : null,
+                    'job_listing_type'     => ! empty( $job_type ) && ! is_wp_error( $job_type ) ? array( $job_type['term_id'] ) : null,
                 ),
                 'meta_input'		=> array(
                     '_jid'			        => $job->id,
