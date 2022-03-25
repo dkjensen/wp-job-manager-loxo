@@ -34,7 +34,7 @@ class Exception extends \Exception {
             $this->details = json_encode( (array) $details );
         }
 
-        WP_Job_Manager_Loxo()->log->error( $message, $this->getDetails() );
+        Log::error( $message, $this->getDetails() );
 
         parent::__construct( __( 'Loxo Message: ', 'wp-job-manager-loxo' ) . $message, intval( $code ), null );
     }

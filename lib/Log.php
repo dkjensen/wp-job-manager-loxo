@@ -18,22 +18,12 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class Log {
 
-	/**
+		/**
 	 * Instance of the logger class
 	 *
 	 * @var Monolog\Logger
 	 */
-	protected $log = null;
-
-
-	/**
-	 * Setup
-	 */
-	public function __construct() {
-		$this->log = new Logger( 'wp-job-manager-loxo' );
-    	$this->log->pushHandler( new StreamHandler( WP_JOB_MANAGER_LOXO_LOG, Logger::DEBUG ) );
-	}
-
+	protected static $log = null;
 
 	/**
 	 * Logs an info message
@@ -42,8 +32,10 @@ class Log {
 	 * @param array  $details
 	 * @return void
 	 */
-	public function info( $message, $details = array() ) {
-		$this->log->info( esc_html( $message ), (array) $details );
+	public static function info( $message, $details = array() ) {
+		self::$log = new Logger( 'wp-job-manager-loxo' );
+    	self::$log->pushHandler( new StreamHandler( WP_JOB_MANAGER_LOXO_LOG, Logger::DEBUG ) );
+		self::$log->info( esc_html( $message ), (array) $details );
 	}
 
 
@@ -54,8 +46,10 @@ class Log {
 	 * @param array  $details
 	 * @return void
 	 */
-	public function error( $message, $details = array() ) {
-		$this->log->error( esc_html( $message ), (array) $details );
+	public static function error( $message, $details = array() ) {
+		self::$log = new Logger( 'wp-job-manager-loxo' );
+    	self::$log->pushHandler( new StreamHandler( WP_JOB_MANAGER_LOXO_LOG, Logger::DEBUG ) );
+		self::$log->error( esc_html( $message ), (array) $details );
 	}
 	
 }

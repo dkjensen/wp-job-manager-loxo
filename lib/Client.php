@@ -43,6 +43,10 @@ class Client {
         return $this->adapter->get_jobs();
     }
 
+    public function get_job_statuses() {
+        return $this->adapter->get_job_statuses();
+    }
+
     
     public function post_job_application( $job_id, $data, $application_id ) {
         return $this->adapter->post_job_application( $job_id, $data, $application_id );

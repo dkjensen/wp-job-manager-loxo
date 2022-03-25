@@ -20,7 +20,14 @@ class Settings {
      * 
      * @var boolean
      */
-    public $connected = false;
+    public $connected = null;
+
+    /**
+     * Job statuses to sync
+     *
+     * @var array
+     */
+    public $job_statuses = null;
 
 
     public function __construct() {
@@ -29,11 +36,11 @@ class Settings {
         // Authorization field callback
         add_action( 'wp_job_manager_admin_field_loxo_setup', array( $this, 'setup_field_callback' ), 10, 4 );
         add_action( 'wp_job_manager_admin_field_loxo_authorization', array( $this, 'loxo_authorization_field_callback' ), 10, 4 );
-        add_action( 'wp_job_manager_admin_field_loxo_job_boards', array( $this, 'job_boards_field_callback' ), 10, 4 );
+        add_action( 'wp_job_manager_admin_field_loxo_job_statuses', array( $this, 'job_statuses_field_callback' ), 10, 4 );
 
         add_action( 'job_manager_loxo_settings', array( $this, 'loxo_authorization' ) );
         add_action( 'job_manager_loxo_settings', array( $this, 'loxo_deauthorization' ) );
-        add_action( 'job_manager_loxo_settings', array( $this, 'loxo_sync_jobs' ) );
+        add_action( 'admin_init', array( $this, 'loxo_sync_jobs' ) );
         add_action( 'admin_enqueue_scripts', array( $this, 'scripts' ) );
     }
 
@@ -45,6 +52,9 @@ class Settings {
      * @return array
      */
     public function settings( $settings ) {
+        $this->connected = $this->connected ?: WP_Job_Manager_Loxo()->clients['loxo']->connected();
+        $this->job_statuses = $this->job_statuses ?: (array) WP_Job_Manager_loxo()->clients['loxo']->get_job_statuses();
+        
         $settings = (array) $settings;
         $settings['loxo'] = array(
             __( 'Loxo', 'wp-job-manager-loxo' ),
@@ -70,6 +80,11 @@ class Settings {
                     'type'          => 'loxo_authorization',
                 ),
                 array(
+                    'name'          => 'loxo_job_statuses',
+                    'label'         => __( 'Job Statuses to Sync', 'wp-job-manager-loxo' ),
+                    'type'          => 'loxo_job_statuses',
+                ),
+                array(
                     'name'          => 'loxo_applications',
                     'label'         => __( 'Post Applications to Loxo', 'wp-job-manager-loxo' ),
                     'type'          => 'checkbox',
@@ -77,7 +92,7 @@ class Settings {
                 ),
             ),
             array(
-                'after' => sprintf( '<a href="%s">%s</a>', wp_nonce_url( admin_url( 'edit.php?post_type=job_listing&page=job-manager-settings&sync=true' ) ), __( 'Sync now', 'wp-job-manager-loxo' ) )
+                'after' => sprintf( '<a href="%s">%s</a>', wp_nonce_url( admin_url( 'edit.php?post_type=job_listing&page=job-manager-settings&sync=loxo' ) ), __( 'Sync now', 'wp-job-manager-loxo' ) )
             ),
         );
 
@@ -85,17 +100,42 @@ class Settings {
     }
 
     public function loxo_authorization_field_callback( $option, $attributes, $value, $placeholder ) {
-        $connected = WP_Job_Manager_Loxo()->clients['loxo']->connected();
         ?>
 
-        <p><?php esc_html_e( $connected ? 'Connected' : 'Not Connected', 'wp-job-manager-loxo' ); ?></p>
+        <p><?php esc_html_e( $this->connected ? 'Connected' : 'Not Connected', 'wp-job-manager-loxo' ); ?></p>
+
+        <?php
+    }
+
+    public function job_statuses_field_callback( $option, $attributes, $value, $placeholder ) {
+        if ( ! $this->connected ) {
+            return;
+        }
+
+        $synced_job_statuses = array_filter( (array) get_option( 'loxo_job_statuses' ) );
+
+        ?>
+
+        <fieldset>
+            <legend class="screen-reader-text"><span><?php _e( 'Job Statuses To Sync', 'wp-job-manager-loxo' ); ?></span></legend>
+
+            <?php foreach ( $this->job_statuses as $job_status ) : ?>
+                
+                <label>
+                    <input name="loxo_job_statuses[]"  type="checkbox" value="<?php print esc_attr( $job_status->id ); ?>" <?php checked( true, in_array( $job_status->id, $synced_job_statuses ) ); ?>>
+                    <?php echo esc_html( $job_status->name ); ?>
+                </label><br>
+
+            <?php endforeach; ?>
+
+        </fieldset>
 
         <?php
     }
 
 
     public function loxo_sync_jobs() {
-        if ( isset( $_GET['sync'] ) && $_GET['sync'] == 'true' && wp_verify_nonce( $_GET['_wpnonce'] ) && current_user_can( 'manage_options' ) ) {
+        if ( isset( $_GET['sync'] ) && $_GET['sync'] == 'loxo' && wp_verify_nonce( $_GET['_wpnonce'] ) && current_user_can( 'manage_options' ) ) {
             do_action( 'job_manager_loxo_sync_jobs' );
         }
     }

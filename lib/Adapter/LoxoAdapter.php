@@ -9,6 +9,8 @@
 namespace SeattleWebCo\WPJobManager\Recruiter\Loxo\Adapter;
 
 use SeattleWebCo\WPJobManager\Recruiter\Loxo\Exception;
+use SeattleWebCo\WPJobManager\Recruiter\Loxo\Log;
+
 use GuzzleHttp\Psr7;
 
 class LoxoAdapter implements Adapter {
@@ -17,10 +19,28 @@ class LoxoAdapter implements Adapter {
         return is_wp_error( $this->request( 'GET', 'jobs?per_page=1' ) ) ? false : true;
     }
 
+    public function get_job_statuses() {
+        $job_statuses = $this->request( 'GET', 'job_statuses' );
+        
+        if ( is_wp_error( $job_statuses ) ) {
+            return array();
+        }
+
+        return (array) $job_statuses;
+    }
 
     public function get_jobs() {
-        $jobs = $this->request( 'GET', 'jobs?per_page=100' );
-        $jobs = isset( $jobs->results ) ? (array) $jobs->results : array();
+        $jobs = array();
+
+        $synced_job_statuses = array_filter( (array) get_option( 'loxo_job_statuses' ) );
+
+        foreach ( $synced_job_statuses as $job_status_id ) {
+            $query = $this->request( 'GET', 'jobs?per_page=100&published=true&job_status_id=' . absint( $job_status_id ) );
+
+            if ( isset( $query->results ) ) {
+                $jobs = array_merge( $jobs, $query->results );
+            }
+        }
 
         return $jobs;
     }
@@ -32,15 +52,22 @@ class LoxoAdapter implements Adapter {
         foreach ( $this->get_jobs() as $job ) {
             $job = $this->get_job( $job->id );
 
-            if ( isset( $job->category ) && isset( $job->category->name ) ) {
-                $category = get_term_by( 'name', $job->category->name, 'job_listing_category', ARRAY_A );
+            $categories = array();
 
-                if ( ! $category ) {
-                    $category = wp_insert_term( $job->category->name, 'job_listing_category' );
+            if ( ! empty( $job->categories ) && is_array( $job->categories ) ) {
+                foreach ( $job->categories as $_category ) {
+                    $category = get_term_by( 'name', $_category->name, 'job_listing_category', ARRAY_A );
+
+                    if ( ! $category ) {
+                        $category = wp_insert_term( $_category->name, 'job_listing_category' );
+                    }
+
+                    if ( ! is_wp_error( $category ) && isset( $category['term_id'] ) ) {
+                        $categories[] = $category['term_id'];
+                    }
                 }
             }
-
-            $category = apply_filters( 'wp_job_manager_loxo_category', $category, $job );
+            $categories = apply_filters( 'wp_job_manager_loxo_categories', $categories, $job );
 
             $job_type = get_term_by( 'name', isset( $job->job_type ) && isset( $job->job_type->name ) ? $job->job_type->name : '', 'job_listing_type', ARRAY_A );
             $job_type = apply_filters( 'wp_job_manager_loxo_job_type', $job_type, $job );
@@ -51,7 +78,7 @@ class LoxoAdapter implements Adapter {
                 'post_status'		=> 'publish',
                 'post_type'			=> 'job_listing',
                 'tax_input'         => array(
-                    'job_listing_category' => ! empty( $category ) && ! is_wp_error( $category ) ? array( $category['term_id'] ) : null,
+                    'job_listing_category' => $categories,
                     'job_listing_type'     => ! empty( $job_type ) && ! is_wp_error( $job_type ) ? array( $job_type['term_id'] ) : null,
                 ),
                 'meta_input'		=> array(
@@ -75,10 +102,16 @@ class LoxoAdapter implements Adapter {
         global $wpdb;
 
         $exists = $wpdb->get_var( $wpdb->prepare( "
-            SELECT post_id 
-            FROM   $wpdb->postmeta 
-            WHERE  meta_key = '_jid'
-            AND    meta_value = '%s' 
+            SELECT pm1.post_id 
+            FROM   $wpdb->postmeta pm1
+            JOIN   $wpdb->postmeta pm2
+                ON pm1.post_id = pm2.post_id
+                AND pm2.meta_key = '_imported_from'
+                AND pm2.meta_value = 'loxo'
+            JOIN   $wpdb->posts p1
+                ON p1.ID = pm1.post_id
+            WHERE  pm1.meta_key = '_jid'
+            AND    pm1.meta_value = '%s' 
             LIMIT  1", $id 
         ) );
 
